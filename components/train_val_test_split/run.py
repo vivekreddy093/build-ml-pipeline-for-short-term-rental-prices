@@ -4,6 +4,7 @@ This script splits the provided dataframe in test and remainder
 """
 import argparse
 import logging
+import os
 import pandas as pd
 import wandb
 import tempfile
@@ -21,10 +22,17 @@ def go(args):
 
     # Download input artifact. This will also note that this script is using this
     # particular version of the artifact
+    artifact_name = args.input
     logger.info(f"Fetching artifact {args.input}")
-    artifact_local_path = run.use_artifact(args.input).file()
 
-    df = pd.read_csv(artifact_local_path)
+    artifact = run.use_artifact(artifact_name)
+    artifact_dir = artifact.download()
+    
+    csv_files = [f for f in os.listdir(artifact_dir) if f.endswith('.csv')]
+        
+    data_path = os.path.join(artifact_dir, csv_files[0])
+
+    df = pd.read_csv(data_path)
 
     logger.info("Splitting trainval and test")
     trainval, test = train_test_split(
@@ -37,17 +45,23 @@ def go(args):
     # Save to output files
     for df, k in zip([trainval, test], ['trainval', 'test']):
         logger.info(f"Uploading {k}_data.csv dataset")
-        with tempfile.NamedTemporaryFile("w") as fp:
+        
+        with tempfile.NamedTemporaryFile("w", delete=False) as fp:
+            fp.close()
 
-            df.to_csv(fp.name, index=False)
+            try:
+                df.to_csv(fp.name, index=False)
 
-            log_artifact(
-                f"{k}_data.csv",
-                f"{k}_data",
-                f"{k} split of dataset",
-                fp.name,
-                run,
-            )
+                log_artifact(
+                    f"{k}_data.csv",
+                    f"{k}_data",
+                    f"{k} split of dataset",
+                    fp.name,
+                    run,
+                )
+            finally:
+                if os.path.exists(fp.name):
+                    os.remove(fp.name)
 
 
 if __name__ == "__main__":
