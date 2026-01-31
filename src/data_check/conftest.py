@@ -1,3 +1,4 @@
+import os
 import pytest
 import pandas as pd
 import wandb
@@ -15,15 +16,23 @@ def pytest_addoption(parser):
 def data(request):
     run = wandb.init(job_type="data_tests", resume=True)
 
-    # Download input artifact. This will also note that this script is using this
-    # particular version of the artifact
-    data_path = run.use_artifact(request.config.option.csv).file()
-
-    if data_path is None:
+    artifact_name = request.config.option.csv
+    
+    if artifact_name is None:
         pytest.fail("You must provide the --csv option on the command line")
 
-    df = pd.read_csv(data_path)
+    artifact = run.use_artifact(artifact_name)
+    artifact_dir = artifact.download()
+    
+    csv_files = [f for f in os.listdir(artifact_dir) if f.endswith('.csv')]
+    
+    if not csv_files:
+        pytest.fail(f"No CSV file found in artifact {artifact_name}")
+        
+    data_path = os.path.join(artifact_dir, csv_files[0])
+    print(data_path)
 
+    df = pd.read_csv(data_path)
     return df
 
 
@@ -31,15 +40,23 @@ def data(request):
 def ref_data(request):
     run = wandb.init(job_type="data_tests", resume=True)
 
-    # Download input artifact. This will also note that this script is using this
-    # particular version of the artifact
-    data_path = run.use_artifact(request.config.option.ref).file()
+    artifact_name = request.config.option.ref
+    
+    if artifact_name is None:
+        pytest.fail("You must provide the --csv option on the command line")
 
-    if data_path is None:
-        pytest.fail("You must provide the --ref option on the command line")
+    artifact = run.use_artifact(artifact_name)
+    artifact_dir = artifact.download()
+    
+    csv_files = [f for f in os.listdir(artifact_dir) if f.endswith('.csv')]
+    
+    if not csv_files:
+        pytest.fail(f"No CSV file found in artifact {artifact_name}")
+        
+    data_path = os.path.join(artifact_dir, csv_files[0])
+    print(data_path)
 
     df = pd.read_csv(data_path)
-
     return df
 
 
@@ -52,6 +69,7 @@ def kl_threshold(request):
 
     return float(kl_threshold)
 
+
 @pytest.fixture(scope='session')
 def min_price(request):
     min_price = request.config.option.min_price
@@ -60,6 +78,7 @@ def min_price(request):
         pytest.fail("You must provide min_price")
 
     return float(min_price)
+
 
 @pytest.fixture(scope='session')
 def max_price(request):
