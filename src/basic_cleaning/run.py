@@ -19,7 +19,9 @@ def go(args):
 
     # Download input artifact. This will also log that this script is using this
     # particular version of the artifact
-    artifact_local_path = run.use_artifact(args.input_artifact).file()
+    download_dir = "downloaded_artifacts"
+    artifact_local_path = run.use_artifact(args.input_artifact).file(root=download_dir)
+    abs_path = os.path.abspath(artifact_local_path)
     
     df = pd.read_csv(artifact_local_path)
 
